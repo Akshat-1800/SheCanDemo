@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 export const metadata = {
   title: "She Can Foundation",
   description:
-    "She Can Foundation empowers youth through education, digital awareness, and community impact programs.",
+    "Empowering women and communities through awareness, advocacy, and social impact.",
 };
 
 export default function RootLayout({ children }) {

@@ -26,7 +26,7 @@ import {
 const roles = ["Volunteer", "Intern", "Community Member"];
 
 const contactSchema = z.object({
-  fullName: z
+  name: z
     .string()
     .trim()
     .min(2, "Please enter at least 2 characters."),
@@ -131,13 +131,13 @@ export default function ContactForm() {
                   <Input
                     id="fullName"
                     placeholder="Your name"
-                    aria-invalid={errors.fullName ? "true" : "false"}
-                    className={errors.fullName ? "border-red-300 ring-1 ring-red-200" : ""}
-                    {...register("fullName")}
+                    aria-invalid={errors.name ? "true" : "false"}
+                    className={errors.name ? "border-red-300 ring-1 ring-red-200" : ""}
+                    {...register("name")}
                   />
-                  {errors.fullName && (
+                  {errors.name && (
                     <p className="text-xs text-red-500">
-                      {errors.fullName.message}
+                      {errors.name.message}
                     </p>
                   )}
                 </div>

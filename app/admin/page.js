@@ -3,16 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import SubmissionDetailsModal from "@/components/admin/SubmissionDetailsModal";
+import SubmissionTable from "@/components/admin/SubmissionTable";
+import SubmissionCard from "@/components/admin/SubmissionCard";
 
 function formatDate(value) {
 	if (!value) return "—";
@@ -35,10 +30,19 @@ function normalizeSubmission(item) {
 	};
 }
 
+function clipMessage(message, limit = 80) {
+	if (!message) return "—";
+	if (message.length <= limit) return message;
+	return `${message.slice(0, limit).trim()}...`;
+}
+
 export default function AdminPage() {
 	const [submissions, setSubmissions] = useState([]);
 	const [status, setStatus] = useState("loading");
 	const [error, setError] = useState("");
+	const [visibleCount, setVisibleCount] = useState(5);
+	const [selectedSubmission, setSelectedSubmission] = useState(null);
+	const [isModalOpen, setIsModalOpen] = useState(false);
 
 	useEffect(() => {
 		let isMounted = true;
@@ -48,7 +52,7 @@ export default function AdminPage() {
 			try {
 				const response = await fetch("/api/contact", { cache: "no-store" });
 				const data = await response.json();
-				const items = Array.isArray(data) ? data : data?.submissions || [];
+				const items = Array.isArray(data) ? data : data?.data || [];
 				const normalized = items.map(normalizeSubmission).sort((a, b) => {
 					const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
 					const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
@@ -72,6 +76,10 @@ export default function AdminPage() {
 		};
 	}, []);
 
+	useEffect(() => {
+		setVisibleCount(5);
+	}, [submissions.length]);
+
 	const stats = useMemo(() => {
 		const total = submissions.length;
 		const volunteers = submissions.filter((item) => item.role === "Volunteer").length;
@@ -85,6 +93,48 @@ export default function AdminPage() {
 			{ label: "Community Members", value: community },
 		];
 	}, [submissions]);
+
+	const visibleSubmissions = useMemo(
+		() => submissions.slice(0, visibleCount),
+		[submissions, visibleCount]
+	);
+
+	const canViewMore = visibleCount < submissions.length;
+
+	const handleSelect = (submission) => {
+		setSelectedSubmission(submission);
+		setIsModalOpen(true);
+	};
+
+	const handleModalChange = (open) => {
+		setIsModalOpen(open);
+		if (!open) {
+			setSelectedSubmission(null);
+		}
+	};
+
+	const handleDeleteSubmission = async (submission) => {
+		const response = await fetch("/api/contact", {
+			method: "DELETE",
+			headers: {
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify({ email: submission.email }),
+		});
+
+		const result = await response.json();
+		if (!response.ok || result?.success === false) {
+			return false;
+		}
+
+		setSubmissions((prev) => {
+			const next = prev.filter((item) => item.email !== submission.email);
+			setVisibleCount((count) => Math.min(count, next.length));
+			return next;
+		});
+
+		return true;
+	};
 
 	return (
 		<main className="min-h-screen bg-[#fffaf7] px-5 pb-16 pt-24 md:px-8">
@@ -167,71 +217,60 @@ export default function AdminPage() {
 								<>
 									<div className="hidden md:block">
 										<ScrollArea className="max-h-[420px]">
-											<Table>
-												<TableHeader>
-													<TableRow>
-														<TableHead>Name</TableHead>
-														<TableHead>Email</TableHead>
-														<TableHead>Role</TableHead>
-														<TableHead>Message</TableHead>
-														<TableHead>Date</TableHead>
-													</TableRow>
-												</TableHeader>
-												<TableBody>
-													{submissions.map((item) => (
-														<TableRow key={item.id}>
-															<TableCell className="font-medium text-stone-900">
-																{item.name}
-															</TableCell>
-															<TableCell>{item.email}</TableCell>
-															<TableCell>
-																<Badge>{item.role}</Badge>
-															</TableCell>
-															<TableCell className="max-w-xs text-sm text-stone-600">
-																{item.message}
-															</TableCell>
-															<TableCell className="text-sm text-stone-500">
-																{formatDate(item.createdAt)}
-															</TableCell>
-														</TableRow>
-													))}
-												</TableBody>
-											</Table>
+											<SubmissionTable
+												items={visibleSubmissions}
+												onSelect={handleSelect}
+												clipMessage={clipMessage}
+												formatDate={formatDate}
+											/>
 										</ScrollArea>
 									</div>
 
 									<div className="grid gap-4 md:hidden">
-										{submissions.map((item) => (
-											<Card
+										{visibleSubmissions.map((item) => (
+											<SubmissionCard
 												key={item.id}
-												className="border-stone-100 bg-[#fff7f1]"
-											>
-												<CardContent className="space-y-3">
-													<div>
-														<p className="text-sm font-semibold text-stone-900">
-															{item.name}
-														</p>
-														<p className="text-xs text-stone-600">
-															{item.email}
-														</p>
-													</div>
-													<Badge className="w-fit">{item.role}</Badge>
-													<p className="text-sm text-stone-700">
-														{item.message}
-													</p>
-													<p className="text-xs text-stone-500">
-														{formatDate(item.createdAt)}
-													</p>
-												</CardContent>
-											</Card>
+												item={item}
+												clipMessage={clipMessage}
+												formatDate={formatDate}
+												onSelect={handleSelect}
+											/>
 										))}
 									</div>
+
+									{canViewMore && (
+										<motion.div
+											initial={{ opacity: 0, y: 10 }}
+											animate={{ opacity: 1, y: 0 }}
+											transition={{ duration: 0.4 }}
+											className="mt-6 flex justify-center"
+										>
+											<Button
+												type="button"
+												onClick={() =>
+													setVisibleCount((prev) =>
+														Math.min(prev + 5, submissions.length)
+													)
+												}
+												className="rounded-full bg-gradient-to-r from-[#e26d5a] to-[#ffb86b] px-6 text-white shadow-lg shadow-orange-200/70 hover:from-[#c65341] hover:to-[#f4a353]"
+											>
+												View More
+											</Button>
+										</motion.div>
+									)}
 								</>
 							)}
 						</CardContent>
 					</Card>
 				</motion.div>
 			</div>
+
+			<SubmissionDetailsModal
+				open={isModalOpen}
+				onOpenChange={handleModalChange}
+				submission={selectedSubmission}
+				onDelete={handleDeleteSubmission}
+			/>
 		</main>
 	);
 }

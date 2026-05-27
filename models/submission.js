@@ -1,6 +1,4 @@
-import { m } from "framer-motion";
 import mongoose from "mongoose";
-import { unique } from "next/dist/build/utils";
 
 const submissionSchema = new mongoose.Schema(
   {
